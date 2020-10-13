@@ -21,7 +21,7 @@ setuptools.setup(
     classifiers=[
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: Implementation :: CPython",
-        "License :: OSI Approved :: MIT",
+        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent"
     ],
     license='MIT'
