@@ -3,6 +3,9 @@ import enum
 from pydantic.utils import get_model
 from pydantic.schema import schema, get_flat_models_from_model, get_model_name_map
 
+from .helper import _OpenAPIGenBaseModel, inherit_fom_basemodel
+
+
 # list of top level class names that we should stop at
 STOPPAGE = set(['NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'Enum'])
 
@@ -22,6 +25,10 @@ def get_schemas_inheritance(model_cls):
     schemas = \
         schema(model_name_map.values(), ref_prefix=ref_prefix)['definitions']
 
+    # add the [possibly] needed baseclass to the list of classes
+    schemas['_OpenAPIGenBaseModel'] = dict(eval(_OpenAPIGenBaseModel.schema_json()))
+    model_name_map['_OpenAPIGenBaseModel'] = _OpenAPIGenBaseModel
+
     # An empty dictionary to collect updated objects
     updated_schemas = {}
 
@@ -40,6 +47,10 @@ def get_schemas_inheritance(model_cls):
 
         top_classes = get_ancestors(main_cls)
         if not top_classes:
+            # update the object to inherit from baseclass which only has type
+            # this is required for dotnet bindings
+            if name != '_OpenAPIGenBaseModel':
+                updated_schemas[name] = inherit_fom_basemodel(schemas[name])
             continue
 
         # Do the real work and update the current schema to use inheritance
@@ -99,7 +110,11 @@ def set_inheritance(name, top_classes, schemas):
 
     # collect required keys
     for t in top_classes:
-        schema_t = schemas[t.__name__]
+        try:
+            schema_t = schemas[t.__name__]
+        except KeyError as error:
+            raise KeyError(f'Failed to find the model name: {error}')
+
         try:
             tc_required = schema_t['required']
         except KeyError:
@@ -117,10 +132,7 @@ def set_inheritance(name, top_classes, schemas):
             # collect type for every field. This is helpful to catch the cases where
             # the same field name has a different new type in the subclass and should be
             # kept to overwrite the original field.
-            if 'description' in dt \
-                    and dt['description'] == 'Place-holder. Overwrite this!':
-                continue
-            elif 'type' in dt:
+            if 'type' in dt:
                 top_classes_prop[pn] = dt['type']
             else:
                 top_classes_prop[pn] = '###'  # no type means use of oneOf or allOf
@@ -165,14 +177,18 @@ def set_inheritance(name, top_classes, schemas):
             # new field. add it to the properties
             print(f'Extending: {prop}')
             data_copy['allOf'][1]['properties'][prop] = values
-        elif 'type' not in values and ('allOf' in values or 'anyOf' in values):
-            # same name diffrent types
+        elif ('type' in values and values['type'] != top_classes_prop[prop]) or \
+                'type' not in values and ('allOf' in values or 'anyOf' in values):
+            # same name different types
             print(f'Found a field with the same name: {prop}.')
             if len(top_classes) > 1:
                 print(f'Trying {name} against {top_classes[1].__name__}.')
                 return set_inheritance(name, top_classes, schemas)
             else:
-                return schemas[name]
+                # try against a base object.
+                print(f'Trying {name} against OpenAPI base object.')
+                _top_classes = [_OpenAPIGenBaseModel, _OpenAPIGenBaseModel]
+                return set_inheritance(name, _top_classes, schemas)
 
     try:
         data_copy['allOf'][1]['properties']['type'] = properties['type']
