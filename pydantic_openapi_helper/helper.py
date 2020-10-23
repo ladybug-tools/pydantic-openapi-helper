@@ -1,4 +1,5 @@
 """Helper functions."""
+from pydantic import BaseModel, Field
 
 
 def create_tag(name):
@@ -33,3 +34,37 @@ def set_format(p):
             # allowed.
             p['items'] = set_format(p['items'])
     return p
+
+
+class _OpenAPIGenBaseModel(BaseModel):
+
+    type: str = Field(
+        'InvalidType',
+        description='A base class to use when there is no baseclass available to fall '
+        'on.'
+    )
+
+
+def inherit_fom_basemodel(model: dict):
+    """Change the schema to inherit from _OpenAPIGenBaseModel."""
+    base = {
+        'allOf': [
+          {
+            '$ref': '#/components/schemas/_OpenAPIGenBaseModel'
+          },
+          {
+            'type': 'object',
+            'properties': {}
+          }
+        ]
+    }
+
+    high_level_keys = {'title', 'description'}
+
+    for key, value in model.items():
+        if key in high_level_keys:
+            base[key] = model[key]
+        else:
+            base['allOf'][1][key] = value
+
+    return base
