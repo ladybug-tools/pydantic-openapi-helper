@@ -77,6 +77,19 @@ def get_ancestors(cls):
         return top_classes
 
 
+def _check_object_types(source, target, prop):
+    """Check if objects with same name have different types.
+
+    In such a case we need to subclass from one higher level.
+    """
+    if 'type' in source:
+        if source['type'] != 'array':
+            return source['type'] != target[prop]
+        else:
+            # for an array check both the type and the type for items
+            return source['type'], source['items'] != target[prop]
+
+
 def set_inheritance(name, top_classes, schemas):
     """Set inheritance for an object.
 
@@ -127,12 +140,16 @@ def set_inheritance(name, top_classes, schemas):
     # collect properties
     for t in top_classes:
         tc_prop = schemas[t.__name__]['properties']
-
         for pn, dt in tc_prop.items():
             # collect type for every field. This is helpful to catch the cases where
             # the same field name has a different new type in the subclass and should be
             # kept to overwrite the original field.
             if 'type' in dt:
+                if dt['type'] == 'array':
+                    # collect both the type and the type for its items
+                    top_classes_prop[pn] = dt['type'], dt['items']
+                else:
+                    top_classes_prop[pn] = dt['type']
                 top_classes_prop[pn] = dt['type']
             else:
                 top_classes_prop[pn] = '###'  # no type means use of oneOf or allOf
@@ -177,7 +194,7 @@ def set_inheritance(name, top_classes, schemas):
             # new field. add it to the properties
             print(f'Extending: {prop}')
             data_copy['allOf'][1]['properties'][prop] = values
-        elif ('type' in values and values['type'] != top_classes_prop[prop]) or \
+        elif _check_object_types(values, top_classes_prop, prop) or \
                 'type' not in values and ('allOf' in values or 'anyOf' in values):
             # same name different types
             print(f'Found a field with the same name: {prop}.')
