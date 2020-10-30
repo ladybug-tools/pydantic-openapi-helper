@@ -25,7 +25,9 @@ jobs:
     install:
     - npm install @semantic-release/exec
     script:
-    - git config --global user.email "releases@ladybug.tools"
+    - pip install -r requirements.txt
+    - pip install -r dev-requirements.txt
+      - git config --global user.email "releases@ladybug.tools"
     - git config --global user.name "ladybugbot"
     - npx semantic-release
   - stage: docs
@@ -33,6 +35,8 @@ jobs:
       - "3.7"
     if: branch = master AND (NOT type IN (pull_request))
     script:
+    - pip install -r requirements.txt
+    - pip install -r dev-requirements.txt
     - sphinx-apidoc -f -e -d 4 -o ./docs ./pydantic_openapi_helper
     - sphinx-build -b html ./docs ./docs/_build/docs
     deploy:
