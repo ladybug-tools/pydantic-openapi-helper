@@ -87,7 +87,7 @@ def _check_object_types(source, target, prop):
             return source['type'] != target[prop]
         else:
             # for an array check both the type and the type for items
-            return source['type'], source['items'] != target[prop]
+            return (source['type'], source['items']) != target[prop]
 
 
 def set_inheritance(name, top_classes, schemas):
@@ -150,7 +150,6 @@ def set_inheritance(name, top_classes, schemas):
                     top_classes_prop[pn] = dt['type'], dt['items']
                 else:
                     top_classes_prop[pn] = dt['type']
-                top_classes_prop[pn] = dt['type']
             else:
                 top_classes_prop[pn] = '###'  # no type means use of oneOf or allOf
 
@@ -188,14 +187,13 @@ def set_inheritance(name, top_classes, schemas):
     # get full list of the properties and add the ones that doesn't exist in 
     # ancestor objects.
     properties = object_dict['properties']
-
     for prop, values in properties.items():
         if prop not in top_classes_prop:
             # new field. add it to the properties
             print(f'Extending: {prop}')
             data_copy['allOf'][1]['properties'][prop] = values
-        elif _check_object_types(values, top_classes_prop, prop) or \
-                'type' not in values and ('allOf' in values or 'anyOf' in values):
+        elif _check_object_types(values, top_classes_prop, prop) \
+                or 'type' not in values and ('allOf' in values or 'anyOf' in values):
             # same name different types
             print(f'Found a field with the same name: {prop}.')
             if len(top_classes) > 1:
