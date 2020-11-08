@@ -1,3 +1,7 @@
+[![Build Status](https://travis-ci.com/ladybug-tools/pydantic-openapi-helper.svg?branch=master)](https://travis-ci.com/ladybug-tools/pydantic-openapi-helper)
+
+[![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-370/)
+
 # pydantic-openapi-helper
 
 A small module to add additional post-processing to the OpenAPI schemas that are generated
