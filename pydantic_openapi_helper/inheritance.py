@@ -268,11 +268,17 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     return model_name_map
 
 
-def class_mapper(models):
+def class_mapper(models, find_and_replace=None):
     """Create a mapper between OpenAPI models and Python modules.
 
     This mapper is used by dotnet generator to organize the models under similar
     module structure.
+
+    Args:
+        models: Input Pydantic models.
+        find_and_replace: A list of two string values for pattern and what  it should be
+            replaced with.
+
     """
 
     if not hasattr(models, '__iter__'):
@@ -295,6 +301,14 @@ def class_mapper(models):
     # remove enum from mapper
     classes = {k: c.__module__ for k, c in mapper.items() if k not in enums}
     enums = {k: c.__module__ for k, c in enums.items()}
+
+    if find_and_replace:
+        fi, rep = find_and_replace
+        for k, v in classes.items():
+            classes[k] = v.replace(fi, rep)
+        for k, v in enums.items():
+            enums[k] = v.replace(fi, rep)
+
     # this sorting only works in python3.7+
     module_mapper['classes'] = {k: classes[k] for k in sorted(classes)}
     module_mapper['enums'] = {k: enums[k] for k in sorted(enums)}
