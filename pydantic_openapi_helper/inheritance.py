@@ -239,6 +239,8 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
             if not isinstance(m, enum.EnumMeta)
         ]
 
+    flat_models = list(set(flat_models))
+
     # this is the list of all the referenced objects
     model_name_map = get_model_name_map(flat_models)
     # flip the dictionary so I can access each class by name
