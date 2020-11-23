@@ -118,11 +118,6 @@ def get_openapi(
             }
             properties['type'] = typ
 
-        if inheritance:
-            # add descriminator to every object
-            # in Ladybug Tools libraries it is always the type property
-            s['discriminator'] = {'propertyName': 'type'}
-
         # add format to numbers and integers
         # this is helpful for C# generators
         for prop in properties:
@@ -135,6 +130,10 @@ def get_openapi(
                     for item in properties[prop]['anyOf']:
                         new_any_of.append(set_format(item))
                     properties[prop]['anyOf'] = new_any_of
+                    # add descriminator to every object
+                    # in Ladybug Tools libraries it is always the type property
+                    if inheritance:
+                        properties[prop]['discriminator'] = {'propertyName': 'type'}
                 else:
                     continue
 
