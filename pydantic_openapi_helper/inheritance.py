@@ -1,4 +1,5 @@
 import enum
+import warnings
 
 from pydantic.utils import get_model
 from pydantic.schema import schema, get_flat_models_from_model, get_model_name_map
@@ -43,9 +44,11 @@ def get_schemas_inheritance(model_cls):
             # enum objects are not included.
             if 'enum' in schemas[name]:
                 continue
-            raise KeyError(f'{name} key not found.')
+            warnings.warn(f'***KeyError: {name} key not found.***')
+            top_classes = []
+        else:
+            top_classes = get_ancestors(main_cls)
 
-        top_classes = get_ancestors(main_cls)
         if not top_classes:
             # update the object to inherit from baseclass which only has type
             # this is required for dotnet bindings
@@ -208,7 +211,7 @@ def set_inheritance(name, top_classes, schemas):
     try:
         data_copy['allOf'][1]['properties']['type'] = properties['type']
     except KeyError:
-        print(f'Found object with no type:{name}')
+        print(f'Found object with no type: {name}')
 
     if 'additionalProperties' in object_dict:
         data_copy['allOf'][1]['additionalProperties'] = \
@@ -224,22 +227,24 @@ def set_inheritance(name, top_classes, schemas):
 
 def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     """Get a dictionary of name: class for all the objects in model."""
-    models = [get_model(model) for model in models]
-    if include_enum:
-        flat_models = [
-            m
-            for model in models
-            for m in get_flat_models_from_model(model)
-        ]
-    else:
-        flat_models = [
-            m
-            for model in models
-            for m in get_flat_models_from_model(model)
-            if not isinstance(m, enum.EnumMeta)
-        ]
+
+    no_enums = [model for model in models if not isinstance(model, enum.EnumMeta)]
+    enums = [model for model in models if isinstance(model, enum.EnumMeta)]
+
+    flat_models = []
+
+    for model in no_enums:
+        try:
+            f_models = get_flat_models_from_model(get_model(model))
+        except TypeError:
+            warnings.warn(f'*** Invalid input objetc: {model}')
+        else:
+            flat_models.extend(f_models)
 
     flat_models = list(set(flat_models))
+
+    if include_enum:
+        flat_models.extend(enums)
 
     # this is the list of all the referenced objects
     model_name_map = get_model_name_map(flat_models)
@@ -247,13 +252,9 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     model_name_map = {v: k for k, v in model_name_map.items()}
 
     if full:
-        if not stoppage:
-            stoppage = set(
-                [
-                    'NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'str',
-                    'Enum'
-                ]
-            )
+        stoppage = stoppage or set(
+            ['NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'str', 'Enum']
+        )
         # Pydantic does not necessarily add all the baseclasses to the OpenAPI
         # documentation. We check all of them and them to the list if they are not
         # already added
@@ -264,6 +265,21 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
                     break
                 if cls.__name__ not in model_name_map:
                     model_name_map[cls.__name__] = cls
+
+        # filter out enum objects
+        if not include_enum:
+            model_name_map = {
+                k: v for k, v in model_name_map.items()
+                if not isinstance(v, enum.EnumMeta)
+            }
+
+        # remove base type objects
+        model_name_map = {
+            k: v for k, v in model_name_map.items()
+            if k not in ('str', 'int', 'dict')
+        }
+
+    assert len(model_name_map) > 0, 'Found no valid Pydantic model in input classes.'
 
     return model_name_map
 
