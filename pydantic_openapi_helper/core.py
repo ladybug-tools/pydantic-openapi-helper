@@ -2,7 +2,7 @@ from typing import List, Any, Dict
 
 from pydantic.schema import schema
 
-from .helper import create_tag, set_format
+from .helper import clean_schemas
 from .inheritance import get_schemas_inheritance
 
 
@@ -32,7 +32,8 @@ def get_openapi(
     description: str = None,
     info: dict = None,
     external_docs: dict = None,
-    inheritance: bool = False
+    inheritance: bool = False,
+    add_discriminator: bool = True
         ) -> Dict:
     """Get openapi compatible dictionary from a list of Pydantic objects.
 
@@ -83,88 +84,11 @@ def get_openapi(
     else:
         schemas = get_schemas_inheritance(base_object)
 
-    # goes to tags
-    tags = []
-    # goes to x-tagGroups['tags']
-    tag_names = []
+    schemas, tags, tag_names = clean_schemas(
+        schemas, add_tags=True, add_discriminator=inheritance and add_discriminator,
+        add_type=True
+    )
 
-    schema_names = list(schemas.keys())
-    schema_names.sort()
-
-    for name in schema_names:
-        model_name, tag = create_tag(name)
-        tag_names.append(model_name)
-        tags.append(tag)
-
-        # sort properties order: put required parameters at begining of the list
-        s = schemas[name]
-
-        if 'properties' in s:
-            properties = s['properties']
-        elif 'enum' in s:
-            # enum
-            continue
-        else:
-            properties = s['allOf'][1]['properties']
-
-        # make all types readOnly
-        try:
-            properties['type']['readOnly'] = True
-        except KeyError:
-            # no type has been set in properties for this object
-            typ = {
-                'title': 'Type', 'default': f'{name}', 'type': 'string',
-                'pattern': f'^{name}$', 'readOnly': True,
-            }
-            properties['type'] = typ
-
-        # add format to numbers and integers
-        # this is helpful for C# generators
-        for prop in properties:
-            try:
-                properties[prop] = set_format(properties[prop])
-            except KeyError:
-                # referenced object
-                if 'anyOf' in properties[prop]:
-                    new_any_of = []
-                    for item in properties[prop]['anyOf']:
-                        new_any_of.append(set_format(item))
-                    properties[prop]['anyOf'] = new_any_of
-                    # add descriminator to every object
-                    # in Ladybug Tools libraries it is always the type property
-                    if inheritance:
-                        properties[prop]['discriminator'] = {'propertyName': 'type'}
-                else:
-                    continue
-
-        # sort fields to keep required ones on top
-        if 'required' in s:
-            required = s['required']
-        elif 'allOf' in s:
-            try:
-                required = s['allOf'][1]['required']
-            except KeyError:
-                # no required field
-                continue
-        else:
-            continue
-
-        sorted_props = {}
-        optional = {}
-        for prop, value in properties.items():
-            if prop in required:
-                sorted_props[prop] = value
-            else:
-                optional[prop] = value
-
-        sorted_props.update(optional)
-
-        if 'properties' in s:
-            s['properties'] = sorted_props
-        else:
-            s['allOf'][1]['properties'] = sorted_props
-
-    tag_names.sort()
     open_api['tags'] = tags
     open_api['x-tagGroups'][0]['tags'] = tag_names
 
