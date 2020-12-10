@@ -109,6 +109,15 @@ def clean_schemas(
                     'pattern': f'^{name}$', 'readOnly': True,
                 }
                 properties['type'] = typ
+        else:
+            if not isinstance(properties['type'], dict) or \
+                    'default' not in properties['type']:
+                print(f'\t\tType is a protected key for class name: {name}.')
+            elif properties['type']['default'] != name:
+                print(
+                    f'\t\tType is a protected key for class name: {name}.\n'
+                    f'\t\tCurrent value is {properties["type"]["default"]}'
+                )
 
         if add_discriminator:
             # add descriminator to every object
