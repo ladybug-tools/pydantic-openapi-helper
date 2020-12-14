@@ -24,6 +24,8 @@ def set_format(p):
     """
     if '$ref' in p:
         return p
+    elif 'anyOf' in p:
+        return p
     elif p['type'] == 'number' and 'format' not in p:
         p['format'] = 'double'
     elif p['type'] == 'integer' and 'format' not in p:
