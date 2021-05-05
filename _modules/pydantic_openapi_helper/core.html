@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pydantic_openapi_helper.core &#8212; openapi helper  documentation</title>
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/bootstrap-sphinx.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<meta charset='utf-8'>
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1'>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script type="text/javascript" src="../../_static/js/jquery-1.11.0.min.js "></script>
+<script type="text/javascript" src="../../_static/js/jquery-fix.js "></script>
+<script type="text/javascript" src="../../_static/bootstrap-3.3.7/js/bootstrap.min.js "></script>
+<script type="text/javascript" src="../../_static/bootstrap-sphinx.js "></script>
+
+  </head><body>
+
+  <div id="navbar" class="navbar navbar-inverse navbar-default navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <!-- .btn-navbar is used as the toggle for collapsed navbar content -->
+        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".nav-collapse">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="../../index.html">
+          openapi helper</a>
+        <span class="navbar-text navbar-version pull-left"><b></b></span>
+      </div>
+
+        <div class="collapse navbar-collapse nav-collapse">
+          <ul class="nav navbar-nav">
+            
+            
+              <li class="dropdown globaltoc-container">
+  <a role="button"
+     id="dLabelGlobalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="../../index.html">Site <b class="caret"></b></a>
+  <ul class="dropdown-menu globaltoc"
+      role="menu"
+      aria-labelledby="dLabelGlobalToc"></ul>
+</li>
+              
+                <li class="dropdown">
+  <a role="button"
+     id="dLabelLocalToc"
+     data-toggle="dropdown"
+     data-target="#"
+     href="#">Page <b class="caret"></b></a>
+  <ul class="dropdown-menu localtoc"
+      role="menu"
+      aria-labelledby="dLabelLocalToc"></ul>
+</li>
+              
+            
+            
+              
+                
+              
+            
+            
+            
+            
+              <li class="hidden-sm"></li>
+            
+          </ul>
+
+          
+            
+<form class="navbar-form navbar-right" action="../../search.html" method="get">
+ <div class="form-group">
+  <input type="text" name="q" class="form-control" placeholder="Search" />
+ </div>
+  <input type="hidden" name="check_keywords" value="yes" />
+  <input type="hidden" name="area" value="default" />
+</form>
+          
+        </div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="row">
+      <div class="col-md-4">
+        <div id="sidebar" class="bs-sidenav" role="complementary">
+        </div>
+      </div>
+    <div class="body col-md-8 content" role="main">
+      
+  <h1>Source code for pydantic_openapi_helper.core</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">from</span> <span class="nn">pydantic.schema</span> <span class="kn">import</span> <span class="n">schema</span>
+
+<span class="kn">from</span> <span class="nn">.helper</span> <span class="kn">import</span> <span class="n">clean_schemas</span>
+<span class="kn">from</span> <span class="nn">.inheritance</span> <span class="kn">import</span> <span class="n">get_schemas_inheritance</span>
+
+
+<span class="sd">&quot;&quot;&quot;base open api dictionary for all schemas.&quot;&quot;&quot;</span>
+<span class="n">_base_open_api</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;openapi&quot;</span><span class="p">:</span> <span class="s2">&quot;3.0.2&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;servers&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">&quot;info&quot;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="s2">&quot;externalDocs&quot;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">&quot;x-tagGroups&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Models&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[]</span>
+        <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="s2">&quot;paths&quot;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="s2">&quot;components&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;schemas&quot;</span><span class="p">:</span> <span class="p">{}}</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="get_openapi"><a class="viewcode-back" href="../../modules/pydantic_openapi_helper.core.html#pydantic_openapi_helper.core.get_openapi">[docs]</a><span class="k">def</span> <span class="nf">get_openapi</span><span class="p">(</span>
+    <span class="n">base_object</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">openapi_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;3.0.2&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">info</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">external_docs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">inheritance</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">add_discriminator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Get openapi compatible dictionary from a list of Pydantic objects.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        base_objects: A list of Pydantic model objects to be included in the OpenAPI</span>
+<span class="sd">            schema.</span>
+<span class="sd">        title: An optional title for OpenAPI title in info field.</span>
+<span class="sd">        version: Schema version to set the version in info.</span>
+<span class="sd">        openapi_version: Version for OpenAPI schema. Default is 3.0.2.</span>
+<span class="sd">        description: A short description for schema info.</span>
+<span class="sd">        info: Schema info as a dictionary. You can use this input to provide title,</span>
+<span class="sd">            version and description together.</span>
+<span class="sd">        external_docs: Link to external docs for schema.</span>
+<span class="sd">        inheritance: A boolean to wheather the OpenAPI specification should be modified</span>
+<span class="sd">            to use polymorphism. We use Pydantic to generate the initial version and then</span>
+<span class="sd">            post-process the output dictionary to generate the new schema.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Dict -- OpenAPI schema as a dictionary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">open_api</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_base_open_api</span><span class="p">)</span>
+
+    <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;openapi&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">openapi_version</span>
+
+    <span class="k">if</span> <span class="n">info</span><span class="p">:</span>
+        <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;info&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">info</span>
+
+    <span class="k">if</span> <span class="n">title</span><span class="p">:</span>
+        <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;info&#39;</span><span class="p">][</span><span class="s1">&#39;title&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">title</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">version</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s1">&#39;Schema version must be specified as argument or from distribution metadata&#39;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">version</span><span class="p">:</span>
+        <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;info&#39;</span><span class="p">][</span><span class="s1">&#39;version&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">version</span>
+
+    <span class="k">if</span> <span class="n">description</span><span class="p">:</span>
+        <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;info&#39;</span><span class="p">][</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">description</span>
+
+    <span class="k">if</span> <span class="n">external_docs</span><span class="p">:</span>
+        <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;externalDocs&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">external_docs</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">inheritance</span><span class="p">:</span>
+        <span class="n">schemas</span> <span class="o">=</span> <span class="n">schema</span><span class="p">(</span><span class="n">base_object</span><span class="p">,</span> <span class="n">ref_prefix</span><span class="o">=</span><span class="s1">&#39;#/components/schemas/&#39;</span><span class="p">)[</span><span class="s1">&#39;definitions&#39;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">schemas</span> <span class="o">=</span> <span class="n">get_schemas_inheritance</span><span class="p">(</span><span class="n">base_object</span><span class="p">)</span>
+
+    <span class="n">schemas</span><span class="p">,</span> <span class="n">tags</span><span class="p">,</span> <span class="n">tag_names</span> <span class="o">=</span> <span class="n">clean_schemas</span><span class="p">(</span>
+        <span class="n">schemas</span><span class="p">,</span> <span class="n">add_tags</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">add_discriminator</span><span class="o">=</span><span class="n">inheritance</span> <span class="ow">and</span> <span class="n">add_discriminator</span><span class="p">,</span>
+        <span class="n">add_type</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;tags&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tags</span>
+    <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;x-tagGroups&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s1">&#39;tags&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">tag_names</span>
+
+    <span class="n">open_api</span><span class="p">[</span><span class="s1">&#39;components&#39;</span><span class="p">][</span><span class="s1">&#39;schemas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">schemas</span>
+
+    <span class="k">return</span> <span class="n">open_api</span></div>
+</pre></div>
+
+    </div>
+      
+  </div>
+</div>
+<footer class="footer">
+  <div class="container">
+    <p class="pull-right">
+      <a href="#">Back to top</a>
+      
+    </p>
+    <p>
+        &copy; Copyright 2021, Ladybug Tools.<br/>
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 3.5.4.<br/>
+    </p>
+  </div>
+</footer>
+  </body>
+</html>
