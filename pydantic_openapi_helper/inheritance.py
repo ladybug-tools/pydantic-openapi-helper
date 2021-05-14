@@ -8,7 +8,8 @@ from .helper import _OpenAPIGenBaseModel, inherit_fom_basemodel
 
 
 # list of top level class names that we should stop at
-STOPPAGE = set(['NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'Enum'])
+STOPPAGE = set(['NoExtraBaseModel', 'ModelMetaclass',
+                'BaseModel', 'object', 'Enum'])
 
 
 def get_schemas_inheritance(model_cls):
@@ -19,7 +20,8 @@ def get_schemas_inheritance(model_cls):
     """
 
     # get a dictionary that maps the name of each model schema to its Pydantic class.
-    model_name_map = get_model_mapper(model_cls, STOPPAGE, full=True, include_enum=False)
+    model_name_map = get_model_mapper(
+        model_cls, STOPPAGE, full=True, include_enum=False)
 
     # get the standard OpenAPI schema for Pydantic for all the new objects
     ref_prefix = '#/components/schemas/'
@@ -27,7 +29,8 @@ def get_schemas_inheritance(model_cls):
         schema(model_name_map.values(), ref_prefix=ref_prefix)['definitions']
 
     # add the [possibly] needed baseclass to the list of classes
-    schemas['_OpenAPIGenBaseModel'] = dict(eval(_OpenAPIGenBaseModel.schema_json()))
+    schemas['_OpenAPIGenBaseModel'] = dict(
+        eval(_OpenAPIGenBaseModel.schema_json()))
     model_name_map['_OpenAPIGenBaseModel'] = _OpenAPIGenBaseModel
 
     # An empty dictionary to collect updated objects
@@ -105,7 +108,8 @@ def set_inheritance(name, top_classes, schemas):
         Dict - updated schema for the object with the input name.
     """
     # this is the list of special keys that we copy in manually
-    copied_keys = set(['type', 'properties', 'required', 'additionalProperties'])
+    copied_keys = set(
+        ['type', 'properties', 'required', 'additionalProperties'])
     # remove the class itself
     print(f'\nProcessing {name}')
     top_classes = top_classes[1:]
@@ -154,7 +158,8 @@ def set_inheritance(name, top_classes, schemas):
                 else:
                     top_classes_prop[pn] = dt['type']
             else:
-                top_classes_prop[pn] = '###'  # no type means use of oneOf or allOf
+                # no type means use of oneOf or allOf
+                top_classes_prop[pn] = '###'
 
     # create a new schema for this object based on the top level class
     data = {
@@ -187,7 +192,7 @@ def set_inheritance(name, top_classes, schemas):
     if len(data_copy['allOf'][1]['required']) == 0:
         del(data_copy['allOf'][1]['required'])
 
-    # get full list of the properties and add the ones that doesn't exist in 
+    # get full list of the properties and add the ones that doesn't exist in
     # ancestor objects.
     properties = object_dict['properties']
     for prop, values in properties.items():
@@ -228,7 +233,8 @@ def set_inheritance(name, top_classes, schemas):
 def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     """Get a dictionary of name: class for all the objects in model."""
 
-    no_enums = [model for model in models if not isinstance(model, enum.EnumMeta)]
+    no_enums = [model for model in models if not isinstance(
+        model, enum.EnumMeta)]
     enums = [model for model in models if isinstance(model, enum.EnumMeta)]
 
     flat_models = []
@@ -253,7 +259,8 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
 
     if full:
         stoppage = stoppage or set(
-            ['NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'str', 'Enum']
+            ['NoExtraBaseModel', 'ModelMetaclass',
+                'BaseModel', 'object', 'str', 'Enum']
         )
         # Pydantic does not necessarily add all the baseclasses to the OpenAPI
         # documentation. We check all of them and them to the list if they are not
@@ -279,7 +286,8 @@ def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
             if k not in ('str', 'int', 'dict')
         }
 
-    assert len(model_name_map) > 0, 'Found no valid Pydantic model in input classes.'
+    assert len(
+        model_name_map) > 0, 'Found no valid Pydantic model in input classes.'
 
     return model_name_map
 
@@ -304,6 +312,10 @@ def class_mapper(models, find_and_replace=None):
 
     # add enum classes to mapper
     schemas = get_schemas_inheritance(models)
+
+    missing_items = {k: v for k,
+                     v in mapper.items() if k not in schemas.keys()}
+
     enums = {}
     for name in schemas:
         s = schemas[name]
@@ -312,6 +324,10 @@ def class_mapper(models, find_and_replace=None):
             info = mapper[name]
             if info.__name__ not in enums:
                 enums[info.__name__] = info
+
+    for name, value in missing_items.items():
+        if name not in enums:
+            enums[name] = value
 
     module_mapper = {}
     # remove enum from mapper
