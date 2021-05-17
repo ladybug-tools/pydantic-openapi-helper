@@ -314,7 +314,7 @@ def class_mapper(models, find_and_replace=None):
     schemas = get_schemas_inheritance(models)
 
     missing_items = {k: v for k,
-                     v in mapper.items() if k not in schemas.keys()}
+                     v in mapper.items() if k not in schemas}
 
     enums = {}
     for name in schemas:
