@@ -6,10 +6,10 @@ updates:
     interval: daily
     time: "11:00"
   ignore:
-  - dependency-name: coverage
-  - dependency-name: coveralls
-  - dependency-name: pytest
-  - dependency-name: pytest-cov
+  - dependency-name: Sphinx
+  - dependency-name: sphinx-bootstrap-theme
+  - dependency-name: sphinxcontrib-fulltoc
+  - dependency-name: sphinxcontrib-websupport
   - dependency-name: twine
   - dependency-name: wheel
   - dependency-name: setuptools

@@ -33,7 +33,7 @@ jobs:
           npx semantic-release
           echo "::set-output name=tag::$nextRelease"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
           PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
       - name: sleep for 10 minutes for PyPI update
