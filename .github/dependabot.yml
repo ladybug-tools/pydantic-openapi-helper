@@ -1,0 +1,20 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "11:00"
+  ignore:
+  - dependency-name: coverage
+  - dependency-name: coveralls
+  - dependency-name: pytest
+  - dependency-name: pytest-cov
+  - dependency-name: twine
+  - dependency-name: wheel
+  - dependency-name: setuptools
+  - dependency-name: importlib-metadata
+  commit-message:
+    prefix: fix
+    prefix-development: chore
+    include: scope
