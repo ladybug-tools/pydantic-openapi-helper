@@ -22,7 +22,7 @@ def set_format(p):
 
     This is helpful for dotnet code generator.
     """
-    if '$ref' in p:
+    if '$ref' in p or 'anyOf' in p:
         return p
     elif p['type'] == 'number' and 'format' not in p:
         p['format'] = 'double'
