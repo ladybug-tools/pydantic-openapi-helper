@@ -1,6 +1,7 @@
 from typing import List, Any, Dict
 
-from pydantic.schema import schema
+# Pydantic V2: Use models_json_schema instead of schema
+from pydantic.json_schema import models_json_schema
 
 from .helper import clean_schemas
 from .inheritance import get_schemas_inheritance
@@ -47,7 +48,7 @@ def get_openapi(
         info: Schema info as a dictionary. You can use this input to provide title,
             version and description together.
         external_docs: Link to external docs for schema.
-        inheritance: A boolean to wheather the OpenAPI specification should be modified
+        inheritance: A boolean to whether the OpenAPI specification should be modified
             to use polymorphism. We use Pydantic to generate the initial version and then
             post-process the output dictionary to generate the new schema.
 
@@ -63,6 +64,8 @@ def get_openapi(
         open_api['info'] = info
 
     if title:
+        if 'info' not in open_api:
+            open_api['info'] = {}
         open_api['info']['title'] = title
 
     if not version:
@@ -71,18 +74,34 @@ def get_openapi(
         )
 
     if version:
+        if 'info' not in open_api:
+            open_api['info'] = {}
         open_api['info']['version'] = version
 
     if description:
+        if 'info' not in open_api:
+            open_api['info'] = {}
         open_api['info']['description'] = description
 
     if external_docs:
         open_api['externalDocs'] = external_docs
 
     if not inheritance:
-        schemas = schema(base_object, ref_prefix='#/components/schemas/')['definitions']
+        # Pydantic V2 Change:
+        # schema() is removed. models_json_schema takes a list of (model, mode) tuples.
+        # It returns (schema, definitions).
+        # ref_prefix is replaced by ref_template.
+        inputs = [(m, 'validation') for m in base_object]
+        _, schemas = models_json_schema(inputs, ref_template='#/components/schemas/{model}')
+
+        # Pydantic V2 Compatibility Fix:
+        # If the returned definitions are wrapped in a '$defs' key, extract them.
+        # This ensures 'schemas' is a flat dict of {ModelName: Schema}
+        schemas = schemas.get('$defs', schemas)
     else:
         schemas = get_schemas_inheritance(base_object)
+        # Ensure inheritance schemas also strip $defs if present
+        schemas = schemas.get('$defs', schemas)
 
     schemas, tags, tag_names = clean_schemas(
         schemas, add_tags=True, add_discriminator=inheritance and add_discriminator,
