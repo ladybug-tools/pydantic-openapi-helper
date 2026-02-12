@@ -258,10 +258,8 @@ def set_inheritance(name, top_classes, schemas):
 
 def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     """Get a dictionary of name: class for all the objects in model."""
-
     # Pydantic V2 does not have get_flat_models_from_model.
     # We must manually traverse the models to find dependencies.
-
     model_name_map = {}
 
     if not isinstance(models, (list, tuple)):
