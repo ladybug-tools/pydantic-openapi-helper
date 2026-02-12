@@ -1,0 +1,7 @@
+pydantic\_openapi\_helper.core module
+=====================================
+
+.. automodule:: pydantic_openapi_helper.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
