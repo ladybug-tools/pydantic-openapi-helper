@@ -1,7 +1,11 @@
 import enum
-from typing import List, Any, Union
+import warnings
+import inspect
+from typing import Set, Type
+from typing import get_args, get_origin
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
+from pydantic.json_schema import models_json_schema
 
 from .helper import _OpenAPIGenBaseModel, inherit_fom_basemodel
 
@@ -21,72 +25,51 @@ def get_schemas_inheritance(model_cls):
     model_name_map = get_model_mapper(model_cls, STOPPAGE, full=True, include_enum=False)
 
     # get the standard OpenAPI schema for Pydantic for all the new objects
-    # V2 Change: Use TypeAdapter to generate schema.
-    # Reference template replaces ref_prefix.
-    # Definitions are now found in '$defs'.
-    adapter = TypeAdapter(List[Any])
-    # We create a dummy schema including all found models to ensure they are in definitions
-    # However, generating schema for the list of values is the standard way.
-    json_schema = adapter.json_schema(
+    model_list = list(model_name_map.values())
+
+    # generate schema.
+    _, schemas = models_json_schema(
+        [(m, 'serialization') for m in model_list], 
         ref_template='#/components/schemas/{model}'
     )
-    # We might need to ensure all models are actually referenced or included.
-    # For a robust generation, we might want to generate the schema for the union of all models.
-    # But sticking to the pattern of passing the list of models:
-    # In V2, generating schema for a list of Types doesn't automatically populate $defs
-    # with those types unless they are referenced.
-    # A better approach in V2 for a flat list of models is generating for each or a Union.
-    # Let's try to mimic the V1 behavior by creating a TypeAdapter for a Union of all models.
 
-    # Simpler approach compatible with previous logic:
-    # Use the discovered models to build the schema.
-    if not model_name_map:
-        schemas = {}
-    else:
-        # Create a union of all types to force generation of definitions
-        UnionType = Any # Fallback
-        if len(model_name_map) > 0:
-            UnionType = List[Union[tuple(model_name_map.values())]]
-
-        adapter = TypeAdapter(UnionType)
-        full_schema = adapter.json_schema(ref_template='#/components/schemas/{model}')
-        schemas = full_schema.get('$defs', {})
-
+    if '$defs' in schemas:
+        defs = schemas.pop('$defs')
+        for k, v in defs.items():
+            if k not in schemas:
+                schemas[k] = v
 
     # add the [possibly] needed baseclass to the list of classes
-    # V2 Change: .model_json_schema() returns a dict, no eval needed.
     schemas['_OpenAPIGenBaseModel'] = _OpenAPIGenBaseModel.model_json_schema()
     model_name_map['_OpenAPIGenBaseModel'] = _OpenAPIGenBaseModel
 
-    # An empty dictionary to collect updated objects
+    # an empty dictionary to collect updated objects
     updated_schemas = {}
 
     # iterate through all the data models
     # find the ones which are subclassed and updated them based on the properties of
     # baseclasses.
-    for name in schemas.keys():
+    for name, model_schema in list(schemas.items()):
         # find the class object from class name
         try:
             main_cls = model_name_map[name]
         except KeyError:
-            # enum objects are not included.
-            if 'enum' in schemas[name]:
+            if 'enum' in model_schema:
                 continue
-            # In V2, some auxiliary schemas might appear in $defs that aren't mapped models
-            # We can skip them if they aren't in our map
+
+            warnings.warn(f'***KeyError: {name} key not found in model map.***')
+
+            if name != '_OpenAPIGenBaseModel' and isinstance(model_schema, dict):
+                updated_schemas[name] = inherit_fom_basemodel(model_schema)
             continue
 
-        else:
-            top_classes = get_ancestors(main_cls)
+        top_classes = get_ancestors(main_cls)
 
         if not top_classes:
-            # update the object to inherit from baseclass which only has type
-            # this is required for dotnet bindings
             if name != '_OpenAPIGenBaseModel':
-                updated_schemas[name] = inherit_fom_basemodel(schemas[name])
+                updated_schemas[name] = inherit_fom_basemodel(model_schema)
             continue
 
-        # Do the real work and update the current schema to use inheritance
         updated_schemas[name] = set_inheritance(name, top_classes, schemas)
 
     # replace updated schemas in original schema
@@ -97,7 +80,7 @@ def get_schemas_inheritance(model_cls):
 
 
 def get_ancestors(cls):
-    # use type.mro to go through all the ancestors for this class and collect them
+    """Use type.mro to go through all the ancestors for this class and collect them."""
     top_classes = []
     if not hasattr(cls, 'mro'):
         return []
@@ -112,17 +95,46 @@ def get_ancestors(cls):
         return top_classes
 
 
-def _check_object_types(source, target, prop):
-    """Check if objects with same name have different types.
+def _extract_type_from_schema(prop_schema):
+    """Helper to extract a type from a schema dict, handling anyOf/oneOf."""
+    if 'type' in prop_schema:
+        if prop_schema['type'] == 'array':
+            return 'array', prop_schema.get('items')
+        return prop_schema['type']
 
-    In such a case we need to subclass from one higher level.
-    """
-    if 'type' in source:
-        if source['type'] != 'array':
-            return source['type'] != target[prop]
-        else:
-            # for an array check both the type and the type for items
-            return (source['type'], source.get('items')) != target[prop]
+    # handle Optional/Union types (anyOf/oneOf)
+    # we look for a non-null type inside
+    candidates = prop_schema.get('anyOf') or prop_schema.get('oneOf')
+    if candidates:
+        for c in candidates:
+            if c.get('type') != 'null':
+                # recursive call in case nested (though usually flat)
+                return _extract_type_from_schema(c)
+
+    return '###'  # unknown or complex type
+
+
+def _check_object_types(source, target, prop):
+    """Check if objects with same name have different types."""
+
+    source_type = _extract_type_from_schema(source)
+
+    # if target doesn't have the prop, we can't conflict
+    if prop not in target:
+        return True
+
+    target_type = target[prop]
+
+    # if types are identical, no conflict
+    if source_type == target_type:
+        return False
+
+    # if one is ### (complex) and the other isn't, we assume they might be different
+    # but usually if we can't determine type, we assume it's complex and let Pydantic handle it
+    if source_type == '###' or target_type == '###':
+        return True
+
+    return True
 
 
 def set_inheritance(name, top_classes, schemas):
@@ -158,34 +170,22 @@ def set_inheritance(name, top_classes, schemas):
 
     # collect required keys
     for t in top_classes:
-        try:
-            schema_t = schemas[t.__name__]
-        except KeyError as error:
-            # It's possible an ancestor isn't in schemas if it wasn't exported
-            # or if it is a base type.
-            continue 
+        t_name = t.__name__
+        if t_name not in schemas:
+            continue
 
-        # V2: use .get() as required is optional
+        schema_t = schemas[t_name]
+
         tc_required = schema_t.get('required', [])
         for r in tc_required:
-            top_classes_required.append(r)
+            if r not in top_classes_required:
+                top_classes_required.append(r)
 
-    # collect properties
-    for t in top_classes:
-        if t.__name__ not in schemas: continue
-        tc_prop = schemas[t.__name__].get('properties', {})
+        tc_prop = schema_t.get('properties', {})
         for pn, dt in tc_prop.items():
-            # collect type for every field. This is helpful to catch the cases where
-            # the same field name has a different new type in the subclass and should be
-            # kept to overwrite the original field.
-            if 'type' in dt:
-                if dt['type'] == 'array':
-                    # collect both the type and the type for its items
-                    top_classes_prop[pn] = dt['type'], dt.get('items')
-                else:
-                    top_classes_prop[pn] = dt['type']
-            else:
-                top_classes_prop[pn] = '###'  # no type means use of oneOf or allOf
+            # use helper function to resolve types including Optional/Union
+            top_classes_prop[pn] = _extract_type_from_schema(dt)
+            print(f"Parent class {t_name} has property: {pn} with type: {top_classes_prop[pn]}")
 
     # create a new schema for this object based on the top level class
     data = {
@@ -203,22 +203,20 @@ def set_inheritance(name, top_classes, schemas):
 
     data_copy = dict(data)
 
+    # handle Required Fields
     current_required = object_dict.get('required', [])
+    new_required = []
 
     if not top_classes_required and current_required:
-        # no required in top level class
-        # add all the required to the subclass
-        for r in current_required:
-            data_copy['allOf'][1]['required'].append(r)
+        new_required = current_required
     elif current_required and top_classes_required:
         # only add the new required fields
         for r in current_required:
             if r not in top_classes_required:
-                data_copy['allOf'][1]['required'].append(r)
+                new_required.append(r)
 
-    # no required fields - delete it from the dictionary
-    if len(data_copy['allOf'][1]['required']) == 0:
-        del(data_copy['allOf'][1]['required'])
+    if new_required:
+        data_copy['allOf'][1]['required'] = new_required
 
     # get full list of the properties and add the ones that doesn't exist in
     # ancestor objects.
@@ -228,10 +226,9 @@ def set_inheritance(name, top_classes, schemas):
             # new field. add it to the properties
             print(f'Extending: {prop}')
             data_copy['allOf'][1]['properties'][prop] = values
-        elif _check_object_types(values, top_classes_prop, prop) \
-                or 'type' not in values and ('allOf' in values or 'anyOf' in values):
+        elif _check_object_types(values, top_classes_prop, prop):
             # same name different types
-            print(f'Found a field with the same name: {prop}.')
+            print(f'Found a field with the same name and different type: {prop}.')
             if len(top_classes) > 1:
                 print(f'Trying {name} against {top_classes[1].__name__}.')
                 return set_inheritance(name, top_classes, schemas)
@@ -256,68 +253,61 @@ def set_inheritance(name, top_classes, schemas):
     return data_copy
 
 
+def _collect_models_recursive(model: Type[BaseModel], found: Set[Type[BaseModel]]):
+    """Recursively find all nested Pydantic models in fields."""
+    if model in found or not hasattr(model, 'model_fields'):
+        return
+
+    found.add(model)
+
+    for field in model.model_fields.values():
+        annotation = field.annotation
+        _extract_models_from_type(annotation, found)
+
+
+def _extract_models_from_type(type_, found: Set[Type[BaseModel]]):
+    """Helper to unwrap types and find Pydantic models."""
+    if inspect.isclass(type_) and issubclass(type_, BaseModel):
+        _collect_models_recursive(type_, found)
+        return
+
+    origin = get_origin(type_)
+    args = get_args(type_)
+
+    if origin is not None:
+        for arg in args:
+            _extract_models_from_type(arg, found)
+
+
 def get_model_mapper(models, stoppage=None, full=True, include_enum=False):
     """Get a dictionary of name: class for all the objects in model."""
-    # Pydantic V2 does not have get_flat_models_from_model.
-    # We must manually traverse the models to find dependencies.
-    model_name_map = {}
-
     if not isinstance(models, (list, tuple)):
         models = [models]
 
-    stack = list(models)
-    visited = set()
+    flat_models_set = set()
 
-    while stack:
-        m = stack.pop()
+    for model in models:
+        if inspect.isclass(model) and issubclass(model, BaseModel):
+            _collect_models_recursive(model, flat_models_set)
+        elif isinstance(model, enum.EnumMeta):
+            if include_enum:
+                flat_models_set.add(model)
 
-        # Skip if not a class or already visited
-        if not isinstance(m, type) or m in visited:
-            continue
-
-        visited.add(m)
-
-        # Check for Pydantic Model
-        is_model = False
-        try:
-            if issubclass(m, BaseModel):
-                is_model = True
-        except TypeError:
-            pass
-
-        # Check for Enum
-        is_enum = isinstance(m, enum.EnumMeta)
-
-        if is_model or is_enum:
-            model_name_map[m.__name__] = m
-
-        if is_model:
-            # Recurse into fields
-            for field_name, field_info in m.model_fields.items():
-                # In V2, annotation holds the type
-                ann = field_info.annotation
-                if hasattr(ann, '__origin__'):
-                    # Handle List[], Union[], etc.
-                    args = getattr(ann, '__args__', [])
-                    for arg in args:
-                        if isinstance(arg, type):
-                            stack.append(arg)
-                elif isinstance(ann, type):
-                    stack.append(ann)
+    model_name_map = {m.__name__: m for m in flat_models_set}
 
     if full:
-        stoppage = stoppage or set(
-            ['NoExtraBaseModel', 'ModelMetaclass', 'BaseModel', 'object', 'str', 'Enum']
-        )
+        stoppage = stoppage or STOPPAGE
 
-        # Collect ancestors
+        # collect ancestors
         current_models = list(model_name_map.values())
         for model in current_models:
-            if hasattr(model, 'mro'):
-                for cls in model.mro():
-                    if cls.__name__ in stoppage:
-                        break
-                    if cls.__name__ not in model_name_map:
+            if not inspect.isclass(model): continue
+
+            for cls in inspect.getmro(model):
+                if cls.__name__ in stoppage:
+                    break
+                if cls.__name__ not in model_name_map:
+                    if issubclass(cls, BaseModel) or isinstance(cls, enum.EnumMeta):
                         model_name_map[cls.__name__] = cls
 
         # filter out enum objects
@@ -359,15 +349,12 @@ def class_mapper(models, find_and_replace=None):
     # add enum classes to mapper
     schemas = get_schemas_inheritance(models)
     enums = {}
-    for name in schemas:
-        s = schemas[name]
-        if 'enum' in s:
-            # add enum
-            # Some schemas in V2 might be autogenerated and not in our mapper
-            if name in mapper:
-                info = mapper[name]
-                if info.__name__ not in enums:
-                    enums[info.__name__] = info
+
+    for name, s in schemas.items():
+        if 'enum' in s and name in mapper:
+            info = mapper[name]
+            if info.__name__ not in enums:
+                enums[info.__name__] = info
 
     module_mapper = {}
     # remove enum from mapper
@@ -381,7 +368,6 @@ def class_mapper(models, find_and_replace=None):
         for k, v in enums.items():
             enums[k] = v.replace(fi, rep)
 
-    # this sorting only works in python3.7+
     module_mapper['classes'] = {k: classes[k] for k in sorted(classes)}
     module_mapper['enums'] = {k: enums[k] for k in sorted(enums)}
 
