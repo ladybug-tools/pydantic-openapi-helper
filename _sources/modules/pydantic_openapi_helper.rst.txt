@@ -1,0 +1,20 @@
+pydantic\_openapi\_helper package
+=================================
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   pydantic_openapi_helper.core
+   pydantic_openapi_helper.helper
+   pydantic_openapi_helper.inheritance
+
+Module contents
+---------------
+
+.. automodule:: pydantic_openapi_helper
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,7 @@
+pydantic_openapi_helper
+=======================
+
+.. toctree::
+   :maxdepth: 4
+
+   pydantic_openapi_helper
