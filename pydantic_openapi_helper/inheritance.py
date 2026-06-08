@@ -97,6 +97,9 @@ def get_ancestors(cls):
 
 def _extract_type_from_schema(prop_schema):
     """Helper to extract a type from a schema dict, handling anyOf/oneOf."""
+    if '$ref' in prop_schema:
+        return prop_schema['$ref']
+
     if 'type' in prop_schema:
         if prop_schema['type'] == 'array':
             return 'array', prop_schema.get('items')
